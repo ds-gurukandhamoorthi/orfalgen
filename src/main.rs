@@ -1,9 +1,10 @@
 use std::env;
 use std::fs;
 use std::process::Command;
+use std::path::Path;
 
 #[derive(Debug)]
-struct FileInfo<'a>{
+pub struct FileInfo<'a>{
     filename: &'a str,
     rank: f32,
     timestamp: u32,
@@ -31,20 +32,37 @@ impl FileInfo <'_> {
                 timestamp,
             })
     }
+
+    pub fn frecency(&self, now : u32) -> f32 {
+        let duration = now - self.timestamp;
+        let coef = match duration{
+            d if d < 3600 => 6,
+            d if d < 3600 * 24 => 4,
+            d if d < 3600 * 24 * 7 => 2,
+            _ => 1,
+        };
+        self.rank * coef as f32
+    }
 }
 
 fn main() {
     let home = env::var("HOME").unwrap();
     let fasd_file = format!("{}/.fasd", home);
 
+    let mut args = env::args().skip(1);
+    let fileext = args.next().unwrap();
+    let prog = args.next().unwrap();
+
     let contents = fs::read_to_string(fasd_file).unwrap();
     let files = contents.lines()
         .map(FileInfo::new)
         .filter_map(Result::ok)
-        .filter(|info| info.filename.ends_with(".pdf"));
-    for file in files{
-        println!("{}", file.filename);
-    }
+        .filter(|info| info.filename.ends_with(&fileext) && Path::new(info.filename).exists());
+    let now = now_ts();
+    let orf = files
+        .max_by_key(|f| (f.frecency(now) * 10000 as f32) as u32); // As there is no ordering in float...
+    let orf = orf.unwrap();
+    Command::new(&prog).arg(orf.filename).spawn().expect("Failed to execute program with relevant file");
 }
 
 fn now_ts() -> u32{
