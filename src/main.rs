@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::process::Command;
 use std::path::Path;
+use std::time::SystemTime;
 
 #[derive(Debug)]
 pub struct FileInfo<'a>{
@@ -58,17 +59,10 @@ fn main() {
         .map(FileInfo::new)
         .filter_map(Result::ok)
         .filter(|info| info.filename.ends_with(&fileext) && Path::new(info.filename).exists());
-    let now = now_ts();
+
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
     let orf = files
         .max_by_key(|f| (f.frecency(now) * 10000 as f32) as u32); // As there is no ordering in float...
     let orf = orf.unwrap();
     Command::new(&prog).arg(orf.filename).spawn().expect("Failed to execute program with relevant file");
-}
-
-fn now_ts() -> u32{
-    let now = Command::new("date").arg("+%s").output().unwrap();
-    let now = String::from_utf8_lossy(now.stdout.as_slice());
-    let now = now.trim();
-    let now: u32 = now.parse().unwrap();
-    now
 }
