@@ -1,39 +1,18 @@
 use std::env;
-use std::fs;
 use std::process::Command;
 use std::path::Path;
 use std::time::SystemTime;
 
-#[derive(Debug)]
-pub struct FileInfo<'a>{
-    filename: &'a str,
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+struct FileInfo{
+    filename: String,
     rank: f32,
     timestamp: u32,
 }
 
-impl FileInfo <'_> {
-    pub fn new<'a>(line: &'a str) -> Result<FileInfo, &'a str>{
-        let mut fields = line.split('|');
-        let filename = match fields.next() {
-            Some(s) => s,
-            None => return Err("Unable to extract filename"),
-        };
-        let rank:f32 = match fields.next().unwrap().parse() {
-            Ok(r) => r,
-            Err(_) => return Err("Unable to parse rank as float"),
-        };
-        let timestamp:u32 = match fields.next().unwrap().parse() {
-            Ok(ts) => ts,
-            Err(_) => return Err("Unable to parse timestamp as unsigned int"),
-        };
-        Ok(
-            FileInfo{
-                filename,
-                rank,
-                timestamp,
-            })
-    }
-
+impl FileInfo {
     pub fn frecency(&self, now : u32) -> f32 {
         let duration = now - self.timestamp;
         let coef = match duration{
@@ -54,15 +33,23 @@ fn main() {
     let fileext = args.next().unwrap();
     let prog = args.next().unwrap();
 
-    let contents = fs::read_to_string(fasd_file).unwrap();
-    let files = contents.lines()
-        .map(FileInfo::new)
-        .filter_map(Result::ok)
-        .filter(|info| info.filename.ends_with(&fileext) && Path::new(info.filename).exists());
+    let mut rdr = csv::ReaderBuilder::new()
+        .delimiter(b'|')
+        .has_headers(false)
+        .from_path(fasd_file).unwrap();
+
+    let mut files = Vec::new();
+    for res in rdr.deserialize() {
+        let finfo: FileInfo = res.unwrap();
+        if finfo.filename.ends_with(&fileext) && Path::new(&finfo.filename).exists() {
+            files.push(finfo);
+        }
+    }
 
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
     let orf = files
+        .iter()
         .max_by_key(|f| (f.frecency(now) * 10000 as f32) as u32); // As there is no ordering in float...
     let orf = orf.unwrap();
-    Command::new(&prog).arg(orf.filename).spawn().expect("Failed to execute program with relevant file");
+    Command::new(&prog).arg(&orf.filename).spawn().expect("Failed to execute program with relevant file");
 }
