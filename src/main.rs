@@ -2,6 +2,7 @@ use std::env;
 use std::process::Command;
 use std::path::Path;
 use std::time::SystemTime;
+use std::fs;
 
 use serde::Deserialize;
 
@@ -29,7 +30,8 @@ fn main() {
     let home = env::var("HOME").unwrap();
     let fasd_file = format!("{}/.fasd", home);
 
-    let mut args = env::args().skip(1);
+    let mut args = env::args();
+    let called_by_name = args.next().unwrap();
     let prog = args.next().unwrap();
     let substrings : Vec<String> = args.collect();
 
@@ -46,7 +48,17 @@ fn main() {
     for res in rdr.deserialize() {
         let finfo: FileInfo = res.unwrap();
         if contains_all_substrings(finfo.filename.as_ref()) && Path::new(&finfo.filename).exists() {
-            files.push(finfo);
+            if called_by_name.contains("dir"){
+                if fs::metadata(&finfo.filename).unwrap().is_dir() {
+                    files.push(finfo);
+                }
+            } else if called_by_name.contains("file"){ //NOTE: Soon we must have something called editable, that avoids binaries, pdfs etc...
+                if fs::metadata(&finfo.filename).unwrap().is_file() {
+                    files.push(finfo);
+                }
+            } else {
+                    files.push(finfo);
+            }
         }
     }
 
@@ -56,5 +68,5 @@ fn main() {
         .max_by_key(|f| (f.frecency(now) * 10000 as f32) as u32); // As there is no ordering in float...
     let orf = orf.unwrap();
     Command::new(&prog).arg(&orf.filename).spawn().expect("Failed to execute program with relevant file");
-    Command::new("fasd").arg("-A").arg(&orf.filename).spawn().expect("Failed to add to fasd");
+    // Command::new("fasd").arg("-A").arg(&orf.filename).spawn().expect("Failed to add to fasd");
 }
