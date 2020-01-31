@@ -30,18 +30,22 @@ fn main() {
     let fasd_file = format!("{}/.fasd", home);
 
     let mut args = env::args().skip(1);
-    let fileext = args.next().unwrap();
     let prog = args.next().unwrap();
+    let substrings : Vec<String> = args.collect();
 
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b'|')
         .has_headers(false)
         .from_path(fasd_file).unwrap();
 
+    let contains_all_substrings = |filename: &str| substrings
+        .iter()
+        .all(|part| filename.contains(part));
+
     let mut files = Vec::new();
     for res in rdr.deserialize() {
         let finfo: FileInfo = res.unwrap();
-        if finfo.filename.ends_with(&fileext) && Path::new(&finfo.filename).exists() {
+        if contains_all_substrings(finfo.filename.as_ref()) && Path::new(&finfo.filename).exists() {
             files.push(finfo);
         }
     }
