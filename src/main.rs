@@ -56,4 +56,5 @@ fn main() {
         .max_by_key(|f| (f.frecency(now) * 10000 as f32) as u32); // As there is no ordering in float...
     let orf = orf.unwrap();
     Command::new(&prog).arg(&orf.filename).spawn().expect("Failed to execute program with relevant file");
+    Command::new("fasd").arg("-A").arg(&orf.filename).spawn().expect("Failed to add to fasd");
 }
