@@ -3,6 +3,7 @@ use std::process::Command;
 use std::path::Path;
 use std::time::SystemTime;
 use std::fs;
+use regex::Regex;
 
 use serde::Deserialize;
 
@@ -33,7 +34,12 @@ fn main() {
     let mut args = env::args();
     let called_by_name = args.next().unwrap();
     let prog = args.next().unwrap();
-    let substrings : Vec<String> = args.collect();
+    let mut substrings : Vec<String> = args.collect();
+    let parent_dir_regex = Regex::new("/[^/]+/[.][.]$").unwrap();
+    //first argument may be a directory... if it's of type parent directory, transform it
+    //appropriately so that rust can understand it. (Unlike bash it doesn't understand
+    // `/home/guru/..`) so -> `/home`.  So we can have bash alias `e..=e ~+/..`
+    substrings[0] = parent_dir_regex.replace(&substrings[0], "").to_string();
 
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b'|')
