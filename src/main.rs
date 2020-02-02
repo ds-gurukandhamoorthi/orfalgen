@@ -58,8 +58,14 @@ fn main() {
                 if fs::metadata(&finfo.filename).unwrap().is_dir() {
                     files.push(finfo);
                 }
-            } else if called_by_name.contains("file"){ //NOTE: Soon we must have something called editable, that avoids binaries, pdfs etc...
+            } else if called_by_name.contains("file") {
                 if fs::metadata(&finfo.filename).unwrap().is_file() {
+                    files.push(finfo);
+                }
+            } else if called_by_name.contains("editable") {
+                let md = fs::metadata(&finfo.filename).unwrap();
+                const EDITABLE_FILE_MAX_SIZE_CRITERION : u64= 10 * 1000; //10 kilos
+                if md.is_file() && md.len() <  EDITABLE_FILE_MAX_SIZE_CRITERION { //NOTE: this criterion is ok for now. later we must find some features like "bigram patterns" of first 100 characters... that is not as time-consuming as a `$(file thisfile)` invocation
                     files.push(finfo);
                 }
             } else {
