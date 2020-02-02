@@ -65,7 +65,7 @@ fn main() {
             } else if called_by_name.contains("editable") {
                 let md = fs::metadata(&finfo.filename).unwrap();
                 const EDITABLE_FILE_MAX_SIZE_CRITERION : u64= 10 * 1000; //10 kilos
-                if md.is_file() && md.len() <  EDITABLE_FILE_MAX_SIZE_CRITERION { //NOTE: this criterion is ok for now. later we must find some features like "bigram patterns" of first 100 characters... that is not as time-consuming as a `$(file thisfile)` invocation
+                if md.is_file() && !md.permissions().readonly() && md.len() <  EDITABLE_FILE_MAX_SIZE_CRITERION { //NOTE: this criterion is ok for now. later we must find some features like "bigram patterns" of first 100 characters... that is not as time-consuming as a `$(file thisfile)` invocation
                     files.push(finfo);
                 }
             } else {
@@ -77,7 +77,7 @@ fn main() {
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
     let orf = files
         .iter()
-        .max_by_key(|f| (f.frecency(now) * 10000 as f32) as u32); // As there is no ordering in float...
+        .max_by_key(|f| (f.frecency(now) * 10000_f32) as u32); // As there is no ordering in float...
     let orf = orf.unwrap();
     Command::new(&prog).arg(&orf.filename).spawn().expect("Failed to execute program with relevant file");
     // Command::new("fasd").arg("-A").arg(&orf.filename).spawn().expect("Failed to add to fasd");
