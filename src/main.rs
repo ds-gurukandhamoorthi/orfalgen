@@ -70,6 +70,8 @@ fn main() {
     // `/home/guru/..`) so -> `/home`.  So we can have bash alias `e..=e ~+/..`
     substrings[0] = parent_dir_regex.replace(&substrings[0], "").to_string();
 
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
+
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b'|')
         .has_headers(false)
@@ -85,29 +87,31 @@ fn main() {
         if contains_all_substrings(finfo.filename.as_ref()) && Path::new(&finfo.filename).exists() {
             if called_by_name.contains("dir"){
                 if fs::metadata(&finfo.filename).unwrap().is_dir() {
-                    files.push(finfo);
+                    files.push(frecency_and_file_info(finfo, now));
                 }
             } else if called_by_name.contains("file") {
                 if fs::metadata(&finfo.filename).unwrap().is_file() {
-                    files.push(finfo);
+                    files.push(frecency_and_file_info(finfo, now));
                 }
             } else if called_by_name.contains("editable") {
                 let md = fs::metadata(&finfo.filename).unwrap();
                 const EDITABLE_FILE_MAX_SIZE_CRITERION : u64= 10 * 1000; //10 kilos
                 if md.is_file() && !md.permissions().readonly() && md.len() <  EDITABLE_FILE_MAX_SIZE_CRITERION { //NOTE: this criterion is ok for now. later we must find some features like "bigram patterns" of first 100 characters... that is not as time-consuming as a `$(file thisfile)` invocation
-                    files.push(finfo);
+                    files.push(frecency_and_file_info(finfo, now));
                 }
             } else {
-                    files.push(finfo);
+                    files.push(frecency_and_file_info(finfo, now));
             }
         }
     }
 
-    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
-    let orf = files
-        .iter()
-        .max_by_key(|f| (f.frecency(now) * 10000_f32) as u32); // As there is no ordering in float...
+    let orf = files.pop();
     let orf = orf.unwrap();
-    Command::new(&prog).arg(&orf.filename).spawn().expect("Failed to execute program with relevant file");
+    Command::new(&prog).arg(&orf.1.filename).spawn().expect("Failed to execute program with relevant file");
     // Command::new("fasd").arg("-A").arg(&orf.filename).spawn().expect("Failed to add to fasd");
+}
+
+fn frecency_and_file_info(finfo: FileInfo, now: u32) -> (u32, FileInfo) {
+    let frec = finfo.frecency(now) * 10000_f32;
+    (frec as u32, finfo)
 }
