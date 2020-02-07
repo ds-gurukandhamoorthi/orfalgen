@@ -4,8 +4,9 @@ use std::path::Path;
 use std::time::SystemTime;
 use std::fs;
 use regex::Regex;
-use std::collections::BinaryHeap;
 use std::cmp::{Ordering, PartialOrd};
+
+use pairing_heap::PairingHeap;
 
 use serde::Deserialize;
 
@@ -86,7 +87,7 @@ fn main() {
         .iter()
         .all(|part| filename.contains(part));
 
-    let mut files = BinaryHeap::new();
+    let mut files = PairingHeap::new();
     for res in rdr.deserialize() {
         let finfo: FileInfo = res.unwrap();
         if contains_all_substrings(finfo.filename.as_ref()) && Path::new(&finfo.filename).exists() {
