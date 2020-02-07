@@ -4,6 +4,8 @@ use std::path::Path;
 use std::time::SystemTime;
 use std::fs;
 use regex::Regex;
+use std::collections::BinaryHeap;
+use std::cmp::{Ordering, PartialOrd};
 
 use serde::Deserialize;
 
@@ -24,6 +26,33 @@ impl FileInfo {
             _ => 1,
         };
         self.rank * coef as f32
+    }
+}
+
+impl PartialEq for FileInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.filename == other.filename
+    }
+}
+
+impl Eq for FileInfo {
+}
+
+impl PartialOrd for FileInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering>{
+        if self.filename < other.filename{
+            Some(Ordering::Less)
+        } else if self.filename > other.filename {
+            Some(Ordering::Greater)
+        } else {
+            Some(Ordering::Equal)
+        }
+    }
+}
+
+impl Ord for FileInfo {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
     }
 }
 
@@ -50,7 +79,7 @@ fn main() {
         .iter()
         .all(|part| filename.contains(part));
 
-    let mut files = Vec::new();
+    let mut files = BinaryHeap::new();
     for res in rdr.deserialize() {
         let finfo: FileInfo = res.unwrap();
         if contains_all_substrings(finfo.filename.as_ref()) && Path::new(&finfo.filename).exists() {
