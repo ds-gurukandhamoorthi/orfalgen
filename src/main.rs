@@ -94,14 +94,6 @@ fn main() {
         .iter()
         .all(|part| filename.contains(part));
 
-    let mut files = PairingHeap::new();
-    for res in rdr.deserialize() {
-        let finfo: FileInfo = res.unwrap();
-        if contains_all_substrings(finfo.filename.as_ref()) {
-            files.push(frecency_and_file_info(finfo));
-        }
-    }
-
     let searched_for = if called_by_name.contains("dir") {
         SearchType::Directory
     } else if called_by_name.contains("file") {
@@ -112,18 +104,29 @@ fn main() {
         SearchType::Other
     };
 
+    let pre_filter = match searched_for{
+        SearchType::Directory => Some(|filename: &str| Path::new(filename).exists() && fs::metadata(filename).unwrap().is_dir()),
+        _ => None
+    };
+
+    let mut files = PairingHeap::new();
+    for res in rdr.deserialize() {
+        let finfo: FileInfo = res.unwrap();
+        if contains_all_substrings(&finfo.filename) {
+            match pre_filter {
+                Some(pre_f) if pre_f(&finfo.filename) => files.push(frecency_and_file_info(finfo)),
+                None => files.push(frecency_and_file_info(finfo)),
+                Some(_) => (), //pre_filter effectively filters (by not adding)
+                }
+        }
+    }
+
     while let Some((_, FileInfo{filename, ..})) = files.peek() {
         if !Path::new(filename).exists() {
             files.pop();
             continue;
         }
         match searched_for {
-            SearchType::Directory => {
-                if !fs::metadata(filename).unwrap().is_dir() {
-                    files.pop();
-                    continue;
-                }
-            }
             SearchType::File => {
                 if !fs::metadata(filename).unwrap().is_file() {
                     files.pop();
