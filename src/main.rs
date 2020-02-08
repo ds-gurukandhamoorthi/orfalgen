@@ -104,9 +104,17 @@ fn main() {
         SearchType::Other
     };
 
-    let pre_filter = match searched_for{
-        SearchType::Directory => Some(|filename: &str| Path::new(filename).exists() && fs::metadata(filename).unwrap().is_dir()),
+    let pre_filter: Option<fn(&str) -> bool> = match searched_for{
+        SearchType::Directory => Some(dir_filter),
+        SearchType::File => Some(file_filter),
+        SearchType::Editable => Some(editable_filter),
         _ => None
+    };
+    let post_filter: Option<fn(&str) -> bool> = match searched_for{
+        SearchType::Directory => None,
+        SearchType::File => None,
+        SearchType::Editable => None,
+        _ => Some(valid_filter),
     };
 
     let mut files = PairingHeap::new();
@@ -122,29 +130,44 @@ fn main() {
     }
 
     while let Some((_, FileInfo{filename, ..})) = files.peek() {
-        if !Path::new(filename).exists() {
-            files.pop();
-            continue;
-        }
-        match searched_for {
-            SearchType::File => {
-                if !fs::metadata(filename).unwrap().is_file() {
-                    files.pop();
-                    continue;
-                }
+        if let Some(post_fi) = post_filter {
+            if post_fi(filename) {
+                Command::new(&prog).arg(filename).spawn().expect("Failed to execute program with relevant file");
+                break;
             }
-            SearchType::Editable => {
-                let md = fs::metadata(&filename).unwrap();
-                const EDITABLE_FILE_MAX_SIZE_CRITERION : u64= 10 * 1000; //10 kilos
-                if !(md.is_file() && !md.permissions().readonly() && md.len() <  EDITABLE_FILE_MAX_SIZE_CRITERION) { //NOTE: this criterion is ok for now. later we must find some features like "bigram patterns" of first 100 characters... that is not as time-consuming as a `$(file thisfile)` invocation
-                    files.pop();
-                    continue;
-                }
-            }
-            _ => ()
+        } else {
+            Command::new(&prog).arg(filename).spawn().expect("Failed to execute program with relevant file");
+            break;
         }
-        Command::new(&prog).arg(filename).spawn().expect("Failed to execute program with relevant file");
-        break;
+        files.pop();
+
     }
-    // Command::new("fasd").arg("-A").arg(&orf.filename).spawn().expect("Failed to add to fasd");
+}
+
+fn dir_filter(filename: &str) -> bool {
+    match fs::metadata(filename){
+        Ok(dir) => dir.is_dir(),
+        _ => false
+    }
+}
+
+fn file_filter(filename: &str) -> bool {
+    match fs::metadata(filename){
+        Ok(file) => file.is_file(),
+        _ => false
+    }
+}
+
+fn editable_filter(filename: &str) -> bool {
+    if let Ok(md) = fs::metadata(filename){
+        const EDITABLE_FILE_MAX_SIZE_CRITERION : u64= 10 * 1000; //10 kilos
+        md.is_file() && !md.permissions().readonly() && md.len() <  EDITABLE_FILE_MAX_SIZE_CRITERION
+            //NOTE: this criterion is ok for now. later we must find some features like "bigram patterns" of first 100 characters... that is not as time-consuming as a `$(file thisfile)` invocation
+    } else {
+        false
+    }
+}
+
+fn valid_filter(filename: &str) -> bool {
+    Path::new(filename).exists()
 }
