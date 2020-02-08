@@ -112,26 +112,26 @@ fn main() {
         SearchType::Other
     };
 
-    while let Some(orf) = files.peek() {
-        if !Path::new(&orf.1.filename).exists() {
+    while let Some((_, FileInfo{filename, ..})) = files.peek() {
+        if !Path::new(filename).exists() {
             files.pop();
             continue;
         }
         match searched_for {
             SearchType::Directory => {
-                if !fs::metadata(&orf.1.filename).unwrap().is_dir() {
+                if !fs::metadata(filename).unwrap().is_dir() {
                     files.pop();
                     continue;
                 }
             }
             SearchType::File => {
-                if !fs::metadata(&orf.1.filename).unwrap().is_file() {
+                if !fs::metadata(filename).unwrap().is_file() {
                     files.pop();
                     continue;
                 }
             }
             SearchType::Editable => {
-                let md = fs::metadata(&orf.1.filename).unwrap();
+                let md = fs::metadata(&filename).unwrap();
                 const EDITABLE_FILE_MAX_SIZE_CRITERION : u64= 10 * 1000; //10 kilos
                 if !(md.is_file() && !md.permissions().readonly() && md.len() <  EDITABLE_FILE_MAX_SIZE_CRITERION) { //NOTE: this criterion is ok for now. later we must find some features like "bigram patterns" of first 100 characters... that is not as time-consuming as a `$(file thisfile)` invocation
                     files.pop();
@@ -140,7 +140,7 @@ fn main() {
             }
             _ => ()
         }
-        Command::new(&prog).arg(&orf.1.filename).spawn().expect("Failed to execute program with relevant file");
+        Command::new(&prog).arg(filename).spawn().expect("Failed to execute program with relevant file");
         break;
     }
     // Command::new("fasd").arg("-A").arg(&orf.filename).spawn().expect("Failed to add to fasd");
