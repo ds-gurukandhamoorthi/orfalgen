@@ -6,7 +6,7 @@ use std::fs;
 use regex::Regex;
 use std::cmp::{Ordering, PartialOrd};
 
-use pairing_heap::PairingHeap;
+use std::collections::BTreeSet;
 
 use serde::Deserialize;
 
@@ -80,8 +80,8 @@ fn main() {
 
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
     let frecency_and_file_info = |finfo: FileInfo| {
-        let frec = finfo.frecency(now) * 10000_f32;
-        (frec as u32, finfo)
+        let frec = -finfo.frecency(now) * 10000_f32;
+        (frec as i32, finfo)
     };
 
 
@@ -105,31 +105,32 @@ fn main() {
     };
 
     let pre_filter: Option<fn(&str) -> bool> = match searched_for{
-        SearchType::Directory => Some(dir_filter),
+        SearchType::Directory => None,
         SearchType::File => Some(file_filter),
         SearchType::Editable => Some(editable_filter),
         _ => None
     };
     let post_filter: Option<fn(&str) -> bool> = match searched_for{
-        SearchType::Directory => None,
+        SearchType::Directory => Some(dir_filter),
         SearchType::File => None,
         SearchType::Editable => None,
         _ => Some(valid_filter),
     };
 
-    let mut files = PairingHeap::new();
+    let mut files = BTreeSet::new();
     for res in rdr.deserialize() {
         let finfo: FileInfo = res.unwrap();
         if contains_all_substrings(&finfo.filename) {
-            match pre_filter {
-                Some(pre_f) if pre_f(&finfo.filename) => files.push(frecency_and_file_info(finfo)),
-                None => files.push(frecency_and_file_info(finfo)),
-                Some(_) => (), //pre_filter effectively filters (by not adding)
-                }
+            files.insert(frecency_and_file_info(finfo));
         }
     }
 
-    while let Some((_, FileInfo{filename, ..})) = files.peek() {
+    for (_,FileInfo{ref filename,..}) in files {
+        if let Some(pre_fi) = pre_filter {
+            if !pre_fi(filename) {
+                continue;
+            }
+        }
         if let Some(post_fi) = post_filter {
             if post_fi(filename) {
                 Command::new(&prog).arg(filename).spawn().expect("Failed to execute program with relevant file");
@@ -139,8 +140,6 @@ fn main() {
             Command::new(&prog).arg(filename).spawn().expect("Failed to execute program with relevant file");
             break;
         }
-        files.pop();
-
     }
 }
 
