@@ -104,43 +104,35 @@ fn main() {
         SearchType::Other
     };
 
-    let pre_filter: Option<fn(&str) -> bool> = match searched_for{
-        SearchType::Directory => Some(dir_filter),
-        SearchType::File => Some(file_filter),
-        SearchType::Editable => Some(editable_filter),
-        _ => None
+    let pre_filter: fn(&str) -> bool = match searched_for{
+        SearchType::Directory => dir_filter,
+        SearchType::File => file_filter,
+        SearchType::Editable => editable_filter,
+        _ => |_| true,
     };
-    let post_filter: Option<fn(&str) -> bool> = match searched_for{
-        SearchType::Directory => None,
-        SearchType::File => None,
-        SearchType::Editable => None,
-        _ => Some(valid_filter),
+    let post_filter: fn(&str) -> bool = match searched_for{
+        SearchType::Directory => |_| true,
+        SearchType::File => |_| true,
+        SearchType::Editable => |_| true,
+        _ => |filename|  Path::new(filename).exists()
     };
 
     let mut files = PairingHeap::new();
     for res in rdr.deserialize() {
         let finfo: FileInfo = res.unwrap();
         if contains_all_substrings(&finfo.filename) {
-            match pre_filter {
-                Some(pre_f) if pre_f(&finfo.filename) => files.push(frecency_and_file_info(finfo)),
-                None => files.push(frecency_and_file_info(finfo)),
-                Some(_) => (), //pre_filter effectively filters (by not adding)
-                }
+            if pre_filter(&finfo.filename) {
+                files.push(frecency_and_file_info(finfo));
+            }
         }
     }
 
     while let Some((_, FileInfo{filename, ..})) = files.peek() {
-        if let Some(post_fi) = post_filter {
-            if post_fi(filename) {
-                Command::new(&prog).arg(filename).spawn().expect("Failed to execute program with relevant file");
-                break;
-            }
-        } else {
+        if post_filter(filename) {
             Command::new(&prog).arg(filename).spawn().expect("Failed to execute program with relevant file");
             break;
         }
         files.pop();
-
     }
 }
 
@@ -166,8 +158,4 @@ fn editable_filter(filename: &str) -> bool {
     } else {
         false
     }
-}
-
-fn valid_filter(filename: &str) -> bool {
-    Path::new(filename).exists()
 }
