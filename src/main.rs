@@ -3,7 +3,6 @@ use std::process::Command;
 use std::path::Path;
 use std::time::SystemTime;
 use std::fs;
-use regex::Regex;
 use std::cmp::{Ordering, PartialOrd};
 
 use pairing_heap::PairingHeap;
@@ -72,11 +71,24 @@ fn main() {
     let called_by_name = args.next().unwrap();
     let prog = args.next().unwrap();
     let mut substrings : Vec<String> = args.collect();
-    let parent_dir_regex = Regex::new("/[^/]+/[.][.]$").unwrap();
     //first argument may be a directory... if it's of type parent directory, transform it
     //appropriately so that rust can understand it. (Unlike bash it doesn't understand
     // `/home/guru/..`) so -> `/home`.  So we can have bash alias `e..=e ~+/..`
-    substrings[0] = parent_dir_regex.replace(&substrings[0], "").to_string();
+    //
+    // With this use of `canonicalize`, we can have `e ..` (edit from parent directory) without any
+    // special alias.
+    // Additionally we have:
+    // `e .` which acts as `e ~+` (previously we only had `e ~+`)
+    // `e ~` edit from home directory.
+    // `e ~-` edit from previous directory.
+    let p = fs::canonicalize(&substrings[0]);
+    if let Ok(path) = p {
+        //if the directory contains file `abc` and we use `e abc` we may not necessarily mean that file. As we would have used `e . abc` or `e ~+ abc`
+        //so better use it as path only if it's a directory.
+        if path.is_dir() {
+            substrings[0] = String::from(path.to_string_lossy());
+        }
+    }
 
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
     let frecency_and_file_info = |finfo: FileInfo| {
@@ -105,13 +117,13 @@ fn main() {
     };
 
     let pre_filter: fn(&str) -> bool = match searched_for{
-        SearchType::Directory => dir_filter,
+        SearchType::Directory => |_| true,
         SearchType::File => file_filter,
         SearchType::Editable => editable_filter,
         _ => |_| true,
     };
     let post_filter: fn(&str) -> bool = match searched_for{
-        SearchType::Directory => |_| true,
+        SearchType::Directory => dir_filter,
         SearchType::File => |_| true,
         SearchType::Editable => |_| true,
         _ => |filename|  Path::new(filename).exists()
