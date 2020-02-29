@@ -47,13 +47,7 @@ impl Eq for FileInfo {
 
 impl PartialOrd for FileInfo {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering>{
-        if self.filename < other.filename{
-            Some(Ordering::Less)
-        } else if self.filename > other.filename {
-            Some(Ordering::Greater)
-        } else {
-            Some(Ordering::Equal)
-        }
+        self.filename.partial_cmp(&other.filename)
     }
 }
 
@@ -132,10 +126,8 @@ fn main() {
     let mut files = PairingHeap::new();
     for res in rdr.deserialize() {
         let finfo: FileInfo = res.unwrap();
-        if contains_all_substrings(&finfo.filename) {
-            if pre_filter(&finfo.filename) {
+        if contains_all_substrings(&finfo.filename) && pre_filter(&finfo.filename) {
                 files.push(frecency_and_file_info(finfo));
-            }
         }
     }
 
