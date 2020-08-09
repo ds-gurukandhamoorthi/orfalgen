@@ -157,9 +157,14 @@ fn file_filter(filename: &str) -> bool {
 fn editable_filter(filename: &str) -> bool {
     if let Ok(md) = fs::metadata(filename){
         const EDITABLE_FILE_MAX_SIZE_CRITERION : u64= 10 * 1000; //10 kilos
-        md.is_file() && !md.permissions().readonly() && md.len() <  EDITABLE_FILE_MAX_SIZE_CRITERION
+        //Some source files like Python may be long: longer than EDITABLE_FILE_MAX_SIZE_CRITERION
+        md.is_file() && !md.permissions().readonly() && (md.len() <  EDITABLE_FILE_MAX_SIZE_CRITERION || exceptionally_long(filename))
             //NOTE: this criterion is ok for now. later we must find some features like "bigram patterns" of first 100 characters... that is not as time-consuming as a `$(file thisfile)` invocation
     } else {
         false
     }
+}
+
+fn exceptionally_long(filename: &str) -> bool {
+    filename.ends_with(".py") || filename.ends_with("rc") || filename.ends_with("installed")
 }
