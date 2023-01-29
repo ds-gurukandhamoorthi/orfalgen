@@ -59,7 +59,7 @@ impl Ord for FileInfo {
 
 fn main() {
     let home = env::var("HOME").unwrap();
-    let fasd_file = format!("{}/.fasd", home);
+    let fasd_file = format!("{home}/.fasd");
 
     let mut args = env::args();
     let called_by_name = args.next().unwrap();
@@ -133,7 +133,7 @@ fn main() {
 
     while let Some((_, FileInfo{filename, ..})) = files.peek() {
         if post_filter(filename) {
-            Command::new(&prog).arg(filename).spawn().expect("Failed to execute program with relevant file");
+            Command::new(prog).arg(filename).spawn().expect("Failed to execute program with relevant file");
             break;
         }
         files.pop();
